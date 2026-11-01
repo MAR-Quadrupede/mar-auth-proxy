@@ -1,0 +1,37 @@
+name: Deploy mar-auth-proxy (RPi ARM64)
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy Auth Proxy on Self-Hosted Raspberry Pi
+    runs-on: [self-hosted, linux, arm64]
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Ensure Container Images Available
+        run: |
+          echo "Caching required container images on Raspberry Pi..."
+          docker pull caddy:2-alpine || true
+          docker pull authelia/authelia:latest || true
+          docker pull cloudflare/cloudflared:latest || true
+
+      - name: Apply Kubernetes Ingress & Auth Stack
+        run: |
+          if command -v kubectl >/dev/null 2>&1 && kubectl cluster-info >/dev/null 2>&1; then
+            echo "Applying mar-auth-proxy configuration and deployment..."
+            kubectl apply -f k8s/configmap.yaml
+            kubectl apply -f k8s/deployment.yaml
+            kubectl rollout restart deployment/mar-auth-proxy -n mar-system || true
+            kubectl rollout status deployment/mar-auth-proxy -n mar-system --timeout=120s || true
+            echo "mar-auth-proxy rollout successful!"
+          else
+            echo "Kubernetes not running. Please check K3s service."
+            exit 1
+          fi

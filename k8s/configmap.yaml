@@ -1,0 +1,258 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mar-auth-proxy-config
+  namespace: mar-system
+  labels:
+    app: mar-auth-proxy
+data:
+  Caddyfile: |
+    {
+    	admin off
+    	auto_https disable_redirects
+    }
+
+    (authelia_auth) {
+    	forward_auth 127.0.0.1:9091 {
+    		uri /api/authz/forward-auth?authelia_url=https://auth-mar.gianlucamorello.it/
+    		copy_headers Remote-User Remote-Groups Remote-Name Remote-Email
+    		header_up X-Forwarded-Proto https
+    		header_up X-Forwarded-Host {host}
+    	}
+    }
+
+    # --- 1. Standard HTTP (Port 80 for Cloudflare Edge Tunnel & direct HTTP) ---
+    :80 {
+    	@auth_host host auth-mar.gianlucamorello.it
+    	handle @auth_host {
+    		reverse_proxy 127.0.0.1:9091
+    	}
+
+    	@dashboard_host host mar-dashboard.gianlucamorello.it
+    	handle @dashboard_host {
+    		import authelia_auth
+
+    		handle /ws* {
+    			reverse_proxy mar-gateway:8765 {
+    				flush_interval -1
+    			}
+    		}
+
+    		handle /stream* {
+    			reverse_proxy mar-vision-service:8443 {
+    				flush_interval -1
+    			}
+    		}
+
+    		handle {
+    			reverse_proxy mar-dashboard:3000
+    		}
+    	}
+
+    	@vision_host host mar-vision.gianlucamorello.it
+    	handle @vision_host {
+    		import authelia_auth
+    		reverse_proxy mar-vision-service:8443 {
+    			flush_interval -1
+    		}
+    	}
+
+    	@gateway_host host mar-gateway.gianlucamorello.it mar-api.gianlucamorello.it
+    	handle @gateway_host {
+    		import authelia_auth
+    		reverse_proxy mar-gateway:8765 {
+    			flush_interval -1
+    		}
+    	}
+
+    	@grafana_host host mar-grafana.gianlucamorello.it
+    	handle @grafana_host {
+    		import authelia_auth
+    		reverse_proxy grafana:3000
+    	}
+
+    	@prometheus_host host mar-prometheus.gianlucamorello.it
+    	handle @prometheus_host {
+    		import authelia_auth
+    		reverse_proxy prometheus:9090
+    	}
+
+    	@portainer_host host mar-portainer.gianlucamorello.it
+    	handle @portainer_host {
+    		import authelia_auth
+    		reverse_proxy portainer:9000
+    	}
+
+    	@s3_host host mar-s3.gianlucamorello.it
+    	handle @s3_host {
+    		import authelia_auth
+    		reverse_proxy mar-s3:9001
+    	}
+
+    	handle {
+    		respond "M.A.R. Auth Proxy - Host Not Found" 404
+    	}
+    }
+
+    # --- 2. Direct Local HTTPS (Port 443 with internal TLS for Sub-50ms Direct Domain Access) ---
+    auth-mar.gianlucamorello.it, mar-dashboard.gianlucamorello.it, mar-vision.gianlucamorello.it, mar-gateway.gianlucamorello.it, mar-api.gianlucamorello.it, mar-grafana.gianlucamorello.it, mar-prometheus.gianlucamorello.it, mar-portainer.gianlucamorello.it, mar-s3.gianlucamorello.it {
+    	tls internal
+
+    	@auth_host host auth-mar.gianlucamorello.it
+    	handle @auth_host {
+    		reverse_proxy 127.0.0.1:9091
+    	}
+
+    	@dashboard_host host mar-dashboard.gianlucamorello.it
+    	handle @dashboard_host {
+    		import authelia_auth
+
+    		handle /ws* {
+    			reverse_proxy mar-gateway:8765 {
+    				flush_interval -1
+    			}
+    		}
+
+    		handle /stream* {
+    			reverse_proxy mar-vision-service:8443 {
+    				flush_interval -1
+    			}
+    		}
+
+    		handle {
+    			reverse_proxy mar-dashboard:3000
+    		}
+    	}
+
+    	@vision_host host mar-vision.gianlucamorello.it
+    	handle @vision_host {
+    		import authelia_auth
+    		reverse_proxy mar-vision-service:8443 {
+    			flush_interval -1
+    		}
+    	}
+
+    	@gateway_host host mar-gateway.gianlucamorello.it mar-api.gianlucamorello.it
+    	handle @gateway_host {
+    		import authelia_auth
+    		reverse_proxy mar-gateway:8765 {
+    			flush_interval -1
+    		}
+    	}
+
+    	@grafana_host host mar-grafana.gianlucamorello.it
+    	handle @grafana_host {
+    		import authelia_auth
+    		reverse_proxy grafana:3000
+    	}
+
+    	@prometheus_host host mar-prometheus.gianlucamorello.it
+    	handle @prometheus_host {
+    		import authelia_auth
+    		reverse_proxy prometheus:9090
+    	}
+
+    	@portainer_host host mar-portainer.gianlucamorello.it
+    	handle @portainer_host {
+    		import authelia_auth
+    		reverse_proxy portainer:9000
+    	}
+
+    	@s3_host host mar-s3.gianlucamorello.it
+    	handle @s3_host {
+    		import authelia_auth
+    		reverse_proxy mar-s3:9001
+    	}
+
+    	handle {
+    		respond "M.A.R. Auth Proxy - Host Not Found" 404
+    	}
+    }
+
+  configuration.yml: |
+    ---
+    server:
+      address: 'tcp://0.0.0.0:9091'
+      buffers:
+        read: 4096
+        write: 4096
+      timeouts:
+        read: '15s'
+        write: '15s'
+        idle: '60s'
+
+    log:
+      level: 'info'
+      format: 'text'
+
+    telemetry:
+      metrics:
+        enabled: false
+
+    theme: 'dark'
+
+    identity_validation:
+      reset_password:
+        jwt_secret: 'placeholder_jwt_secret_please_override_in_env_or_secrets_32b'
+
+    authentication_backend:
+      password_reset:
+        disable: true
+      file:
+        path: '/etc/authelia/users_database.yml'
+        watch: true
+        password:
+          algorithm: argon2id
+          iterations: 3
+          memory: 65536
+          parallelism: 4
+          key_length: 32
+          salt_length: 16
+
+    access_control:
+      default_policy: deny
+      rules:
+        - domain: 'auth-mar.gianlucamorello.it'
+          policy: bypass
+
+        - domain:
+            - 'mar-dashboard.gianlucamorello.it'
+            - 'mar-vision.gianlucamorello.it'
+            - 'mar-gateway.gianlucamorello.it'
+            - 'mar-api.gianlucamorello.it'
+            - 'mar-grafana.gianlucamorello.it'
+            - 'mar-prometheus.gianlucamorello.it'
+            - 'mar-portainer.gianlucamorello.it'
+            - 'mar-s3.gianlucamorello.it'
+          subject:
+            - 'group:admins'
+            - 'group:mar'
+          policy: one_factor
+
+    session:
+      name: 'mar_session'
+      secret: 'placeholder_session_secret_override_in_env_or_secrets_32b'
+      expiration: '12h'
+      inactivity: '1h'
+      redis:
+        host: 'mar-redis'
+        port: 6379
+      cookies:
+        - domain: 'gianlucamorello.it'
+          authelia_url: 'https://auth-mar.gianlucamorello.it'
+          default_redirection_url: 'https://mar-dashboard.gianlucamorello.it'
+          same_site: 'lax'
+
+    regulation:
+      max_retries: 5
+      find_time: '2m'
+      ban_time: '5m'
+
+    storage:
+      encryption_key: 'placeholder_encryption_key_override_in_env_or_secrets_32b'
+      local:
+        path: '/data/db.sqlite3'
+
+    notifier:
+      filesystem:
+        filename: '/data/notifications.txt'

@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  authelia:
+    image: authelia/authelia:latest
+    container_name: mar-authelia
+    restart: unless-stopped
+    volumes:
+      - ./authelia/configuration.yml:/config/configuration.yml:ro
+      - ./authelia/users_database.yml:/config/users_database.yml:ro
+      - authelia_data:/data
+    ports:
+      - "9091:9091"
+    environment:
+      - TZ=Europe/Rome
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: mar-caddy
+    restart: unless-stopped
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+    ports:
+      - "80:80"
+    depends_on:
+      - authelia
+    environment:
+      - TZ=Europe/Rome
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: mar-cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - caddy
+    environment:
+      - TZ=Europe/Rome
+
+volumes:
+  authelia_data:

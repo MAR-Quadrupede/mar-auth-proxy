@@ -1,0 +1,11 @@
+---
+# Authelia File-based User Database (TEMPLATE)
+# In production, inject credentials into Kubernetes Secret 'mar-auth-users':
+# kubectl create secret generic mar-auth-users --from-file=users_database.yml=users_database.yml -n mar-system
+users:
+  mar:
+    displayname: "M.A.R. Operator"
+    password: "$argon2id$v=19$m=65536,t=3,p=4$PLACEHOLDER_HASH_CHANGE_ME"
+    email: mar@gianlucamorello.it
+    groups:
+      - mar

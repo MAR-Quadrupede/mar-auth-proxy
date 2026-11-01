@@ -1,0 +1,86 @@
+---
+server:
+  address: 'tcp://0.0.0.0:9091'
+  buffers:
+    read: 4096
+    write: 4096
+  timeouts:
+    read: '15s'
+    write: '15s'
+    idle: '60s'
+
+log:
+  level: 'info'
+  format: 'text'
+
+telemetry:
+  metrics:
+    enabled: false
+
+theme: 'dark'
+
+identity_validation:
+  reset_password:
+    jwt_secret: 'placeholder_jwt_secret_please_override_in_env_or_secrets_32b'
+
+authentication_backend:
+  password_reset:
+    disable: true
+  file:
+    path: '/etc/authelia/users_database.yml'
+    watch: true
+    password:
+      algorithm: argon2id
+      iterations: 3
+      memory: 65536
+      parallelism: 4
+      key_length: 32
+      salt_length: 16
+
+access_control:
+  default_policy: deny
+  rules:
+    - domain: 'auth-mar.gianlucamorello.it'
+      policy: bypass
+
+    - domain:
+        - 'mar-dashboard.gianlucamorello.it'
+        - 'mar-vision.gianlucamorello.it'
+        - 'mar-gateway.gianlucamorello.it'
+        - 'mar-api.gianlucamorello.it'
+        - 'mar-grafana.gianlucamorello.it'
+        - 'mar-prometheus.gianlucamorello.it'
+        - 'mar-portainer.gianlucamorello.it'
+        - 'mar-s3.gianlucamorello.it'
+      subject:
+        - 'group:admins'
+        - 'group:mar'
+      policy: one_factor
+
+session:
+  name: 'mar_session'
+  secret: 'placeholder_session_secret_override_in_env_or_secrets_32b'
+  expiration: '12h'
+  inactivity: '1h'
+  redis:
+    host: 'mar-redis'
+    port: 6379
+  cookies:
+    - domain: 'gianlucamorello.it'
+      authelia_url: 'https://auth-mar.gianlucamorello.it'
+      default_redirection_url: 'https://mar-dashboard.gianlucamorello.it'
+      same_site: 'lax'
+
+regulation:
+  max_retries: 5
+  find_time: '2m'
+  ban_time: '5m'
+
+storage:
+  encryption_key: 'placeholder_encryption_key_override_in_env_or_secrets_32b'
+  local:
+    path: '/data/db.sqlite3'
+
+notifier:
+  filesystem:
+    filename: '/data/notifications.txt'
