@@ -21,72 +21,213 @@ data:
     	}
     }
 
-    # --- 1. Standard HTTP (Port 80 for Cloudflare Edge Tunnel & direct HTTP) ---
     :80 {
+    	encode zstd gzip
+
+    	# --- 1. Authelia SSO Login Portal ---
     	@auth_host host auth-mar.gianlucamorello.it
     	handle @auth_host {
-    		reverse_proxy 127.0.0.1:9091
+    		handle /static/* {
+    			header Cache-Control "public, max-age=31536000, immutable"
+    			reverse_proxy 127.0.0.1:9091 {
+    				header_up X-Forwarded-Proto https
+    				header_up X-Forwarded-Host {host}
+    			}
+    		}
+
+    		handle /api/health {
+    			reverse_proxy 127.0.0.1:9091 {
+    				header_up X-Forwarded-Proto https
+    				header_up X-Forwarded-Host {host}
+    			}
+    		}
+
+    		handle {
+    			reverse_proxy 127.0.0.1:9091 {
+    				header_up X-Forwarded-Proto https
+    				header_up X-Forwarded-Host {host}
+    			}
+    		}
     	}
 
+    	# --- 2. M.A.R. Operator Dashboard (Next.js) ---
     	@dashboard_host host mar-dashboard.gianlucamorello.it
     	handle @dashboard_host {
-    		import authelia_auth
+    		handle /_next/static/* {
+    			header Cache-Control "public, max-age=31536000, immutable"
+    			reverse_proxy mar-dashboard:3000 {
+    				header_up X-Forwarded-Proto https
+    				header_up X-Forwarded-Host {host}
+    			}
+    		}
+
+    		handle /favicon.ico {
+    			header Cache-Control "public, max-age=86400"
+    			reverse_proxy mar-dashboard:3000 {
+    				header_up X-Forwarded-Proto https
+    				header_up X-Forwarded-Host {host}
+    			}
+    		}
 
     		handle /ws* {
     			reverse_proxy mar-gateway:8765 {
+    				header_up X-Forwarded-Proto https
+    				header_up X-Forwarded-Host {host}
     				flush_interval -1
+    				transport http {
+    					read_timeout 0
+    					write_timeout 0
+    				}
     			}
     		}
 
     		handle /stream* {
     			reverse_proxy mar-vision-service:8443 {
+    				header_up X-Forwarded-Proto https
+    				header_up X-Forwarded-Host {host}
     				flush_interval -1
+    				transport http {
+    					read_timeout 0
+    					write_timeout 0
+    				}
     			}
     		}
 
     		handle {
-    			reverse_proxy mar-dashboard:3000
+    			import authelia_auth
+    			reverse_proxy mar-dashboard:3000 {
+    				header_up X-Forwarded-Proto https
+    				header_up X-Forwarded-Host {host}
+    			}
     		}
     	}
 
+    	# --- 3. M.A.R. 3D Stereo Vision, Streams & Top-Down 2D Map ---
     	@vision_host host mar-vision.gianlucamorello.it
     	handle @vision_host {
-    		import authelia_auth
-    		reverse_proxy mar-vision-service:8443 {
-    			flush_interval -1
+    		handle /api/status {
+    			reverse_proxy mar-vision-service:8443 {
+    				header_up X-Forwarded-Proto https
+    				header_up X-Forwarded-Host {host}
+    			}
+    		}
+
+    		handle /health {
+    			reverse_proxy mar-vision-service:8443 {
+    				header_up X-Forwarded-Proto https
+    				header_up X-Forwarded-Host {host}
+    			}
+    		}
+
+    		handle {
+    			import authelia_auth
+    			reverse_proxy mar-vision-service:8443 {
+    				header_up X-Forwarded-Proto https
+    				header_up X-Forwarded-Host {host}
+    				flush_interval -1
+    				transport http {
+    					read_timeout 0
+    					write_timeout 0
+    				}
+    			}
     		}
     	}
 
+    	# --- 4. M.A.R. Telemetry & Remote Control WebSocket / REST Gateway ---
     	@gateway_host host mar-gateway.gianlucamorello.it mar-api.gianlucamorello.it
     	handle @gateway_host {
-    		import authelia_auth
-    		reverse_proxy mar-gateway:8765 {
-    			flush_interval -1
+    		handle /health {
+    			reverse_proxy mar-gateway:8765 {
+    				header_up X-Forwarded-Proto https
+    				header_up X-Forwarded-Host {host}
+    			}
+    		}
+
+    		handle {
+    			import authelia_auth
+    			reverse_proxy mar-gateway:8765 {
+    				header_up X-Forwarded-Proto https
+    				header_up X-Forwarded-Host {host}
+    				flush_interval -1
+    				transport http {
+    					read_timeout 0
+    					write_timeout 0
+    				}
+    			}
     		}
     	}
 
+    	# --- 5. Grafana Dashboard (Fast Static Assets & Auth-Proxy) ---
     	@grafana_host host mar-grafana.gianlucamorello.it
     	handle @grafana_host {
-    		import authelia_auth
-    		reverse_proxy grafana:3000
+    		handle /public/* {
+    			header Cache-Control "public, max-age=31536000, immutable"
+    			reverse_proxy grafana:3000 {
+    				header_up X-Forwarded-Proto https
+    				header_up X-Forwarded-Host {host}
+    			}
+    		}
+
+    		handle /avatar/* {
+    			header Cache-Control "public, max-age=86400"
+    			reverse_proxy grafana:3000 {
+    				header_up X-Forwarded-Proto https
+    				header_up X-Forwarded-Host {host}
+    			}
+    		}
+
+    		handle /favicon.ico {
+    			header Cache-Control "public, max-age=86400"
+    			reverse_proxy grafana:3000 {
+    				header_up X-Forwarded-Proto https
+    				header_up X-Forwarded-Host {host}
+    			}
+    		}
+
+    		handle /api/health {
+    			reverse_proxy grafana:3000 {
+    				header_up X-Forwarded-Proto https
+    				header_up X-Forwarded-Host {host}
+    			}
+    		}
+
+    		handle {
+    			import authelia_auth
+    			reverse_proxy grafana:3000 {
+    				header_up X-Forwarded-Proto https
+    				header_up X-Forwarded-Host {host}
+    			}
+    		}
     	}
 
+    	# --- 6. Prometheus Metrics ---
     	@prometheus_host host mar-prometheus.gianlucamorello.it
     	handle @prometheus_host {
     		import authelia_auth
-    		reverse_proxy prometheus:9090
+    		reverse_proxy prometheus:9090 {
+    			header_up X-Forwarded-Proto https
+    			header_up X-Forwarded-Host {host}
+    		}
     	}
 
+    	# --- 7. Portainer Management GUI ---
     	@portainer_host host mar-portainer.gianlucamorello.it
     	handle @portainer_host {
     		import authelia_auth
-    		reverse_proxy portainer:9000
+    		reverse_proxy portainer:9000 {
+    			header_up X-Forwarded-Proto https
+    			header_up X-Forwarded-Host {host}
+    		}
     	}
 
+    	# --- 8. MinIO S3 Object Storage Console ---
     	@s3_host host mar-s3.gianlucamorello.it
     	handle @s3_host {
     		import authelia_auth
-    		reverse_proxy mar-s3:9001
+    		reverse_proxy mar-s3:9001 {
+    			header_up X-Forwarded-Proto https
+    			header_up X-Forwarded-Host {host}
+    		}
     	}
 
     	handle {
@@ -94,74 +235,214 @@ data:
     	}
     }
 
-    # --- 2. Direct Local HTTPS (Port 443 with internal TLS for Sub-50ms Direct Domain Access) ---
-    auth-mar.gianlucamorello.it, mar-dashboard.gianlucamorello.it, mar-vision.gianlucamorello.it, mar-gateway.gianlucamorello.it, mar-api.gianlucamorello.it, mar-grafana.gianlucamorello.it, mar-prometheus.gianlucamorello.it, mar-portainer.gianlucamorello.it, mar-s3.gianlucamorello.it {
+    :443 {
     	tls internal
+    	encode zstd gzip
 
+    	# --- 1. Authelia SSO Login Portal ---
     	@auth_host host auth-mar.gianlucamorello.it
     	handle @auth_host {
-    		reverse_proxy 127.0.0.1:9091
+    		handle /static/* {
+    			header Cache-Control "public, max-age=31536000, immutable"
+    			reverse_proxy 127.0.0.1:9091 {
+    				header_up X-Forwarded-Proto https
+    				header_up X-Forwarded-Host {host}
+    			}
+    		}
+
+    		handle /api/health {
+    			reverse_proxy 127.0.0.1:9091 {
+    				header_up X-Forwarded-Proto https
+    				header_up X-Forwarded-Host {host}
+    			}
+    		}
+
+    		handle {
+    			reverse_proxy 127.0.0.1:9091 {
+    				header_up X-Forwarded-Proto https
+    				header_up X-Forwarded-Host {host}
+    			}
+    		}
     	}
 
+    	# --- 2. M.A.R. Operator Dashboard (Next.js) ---
     	@dashboard_host host mar-dashboard.gianlucamorello.it
     	handle @dashboard_host {
-    		import authelia_auth
+    		handle /_next/static/* {
+    			header Cache-Control "public, max-age=31536000, immutable"
+    			reverse_proxy mar-dashboard:3000 {
+    				header_up X-Forwarded-Proto https
+    				header_up X-Forwarded-Host {host}
+    			}
+    		}
+
+    		handle /favicon.ico {
+    			header Cache-Control "public, max-age=86400"
+    			reverse_proxy mar-dashboard:3000 {
+    				header_up X-Forwarded-Proto https
+    				header_up X-Forwarded-Host {host}
+    			}
+    		}
 
     		handle /ws* {
     			reverse_proxy mar-gateway:8765 {
+    				header_up X-Forwarded-Proto https
+    				header_up X-Forwarded-Host {host}
     				flush_interval -1
+    				transport http {
+    					read_timeout 0
+    					write_timeout 0
+    				}
     			}
     		}
 
     		handle /stream* {
     			reverse_proxy mar-vision-service:8443 {
+    				header_up X-Forwarded-Proto https
+    				header_up X-Forwarded-Host {host}
     				flush_interval -1
+    				transport http {
+    					read_timeout 0
+    					write_timeout 0
+    				}
     			}
     		}
 
     		handle {
-    			reverse_proxy mar-dashboard:3000
+    			import authelia_auth
+    			reverse_proxy mar-dashboard:3000 {
+    				header_up X-Forwarded-Proto https
+    				header_up X-Forwarded-Host {host}
+    			}
     		}
     	}
 
+    	# --- 3. M.A.R. 3D Stereo Vision, Streams & Top-Down 2D Map ---
     	@vision_host host mar-vision.gianlucamorello.it
     	handle @vision_host {
-    		import authelia_auth
-    		reverse_proxy mar-vision-service:8443 {
-    			flush_interval -1
+    		handle /api/status {
+    			reverse_proxy mar-vision-service:8443 {
+    				header_up X-Forwarded-Proto https
+    				header_up X-Forwarded-Host {host}
+    			}
+    		}
+
+    		handle /health {
+    			reverse_proxy mar-vision-service:8443 {
+    				header_up X-Forwarded-Proto https
+    				header_up X-Forwarded-Host {host}
+    			}
+    		}
+
+    		handle {
+    			import authelia_auth
+    			reverse_proxy mar-vision-service:8443 {
+    				header_up X-Forwarded-Proto https
+    				header_up X-Forwarded-Host {host}
+    				flush_interval -1
+    				transport http {
+    					read_timeout 0
+    					write_timeout 0
+    				}
+    			}
     		}
     	}
 
+    	# --- 4. M.A.R. Telemetry & Remote Control WebSocket / REST Gateway ---
     	@gateway_host host mar-gateway.gianlucamorello.it mar-api.gianlucamorello.it
     	handle @gateway_host {
-    		import authelia_auth
-    		reverse_proxy mar-gateway:8765 {
-    			flush_interval -1
+    		handle /health {
+    			reverse_proxy mar-gateway:8765 {
+    				header_up X-Forwarded-Proto https
+    				header_up X-Forwarded-Host {host}
+    			}
+    		}
+
+    		handle {
+    			import authelia_auth
+    			reverse_proxy mar-gateway:8765 {
+    				header_up X-Forwarded-Proto https
+    				header_up X-Forwarded-Host {host}
+    				flush_interval -1
+    				transport http {
+    					read_timeout 0
+    					write_timeout 0
+    				}
+    			}
     		}
     	}
 
+    	# --- 5. Grafana Dashboard (Fast Static Assets & Auth-Proxy) ---
     	@grafana_host host mar-grafana.gianlucamorello.it
     	handle @grafana_host {
-    		import authelia_auth
-    		reverse_proxy grafana:3000
+    		handle /public/* {
+    			header Cache-Control "public, max-age=31536000, immutable"
+    			reverse_proxy grafana:3000 {
+    				header_up X-Forwarded-Proto https
+    				header_up X-Forwarded-Host {host}
+    			}
+    		}
+
+    		handle /avatar/* {
+    			header Cache-Control "public, max-age=86400"
+    			reverse_proxy grafana:3000 {
+    				header_up X-Forwarded-Proto https
+    				header_up X-Forwarded-Host {host}
+    			}
+    		}
+
+    		handle /favicon.ico {
+    			header Cache-Control "public, max-age=86400"
+    			reverse_proxy grafana:3000 {
+    				header_up X-Forwarded-Proto https
+    				header_up X-Forwarded-Host {host}
+    			}
+    		}
+
+    		handle /api/health {
+    			reverse_proxy grafana:3000 {
+    				header_up X-Forwarded-Proto https
+    				header_up X-Forwarded-Host {host}
+    			}
+    		}
+
+    		handle {
+    			import authelia_auth
+    			reverse_proxy grafana:3000 {
+    				header_up X-Forwarded-Proto https
+    				header_up X-Forwarded-Host {host}
+    			}
+    		}
     	}
 
+    	# --- 6. Prometheus Metrics ---
     	@prometheus_host host mar-prometheus.gianlucamorello.it
     	handle @prometheus_host {
     		import authelia_auth
-    		reverse_proxy prometheus:9090
+    		reverse_proxy prometheus:9090 {
+    			header_up X-Forwarded-Proto https
+    			header_up X-Forwarded-Host {host}
+    		}
     	}
 
+    	# --- 7. Portainer Management GUI ---
     	@portainer_host host mar-portainer.gianlucamorello.it
     	handle @portainer_host {
     		import authelia_auth
-    		reverse_proxy portainer:9000
+    		reverse_proxy portainer:9000 {
+    			header_up X-Forwarded-Proto https
+    			header_up X-Forwarded-Host {host}
+    		}
     	}
 
+    	# --- 8. MinIO S3 Object Storage Console ---
     	@s3_host host mar-s3.gianlucamorello.it
     	handle @s3_host {
     		import authelia_auth
-    		reverse_proxy mar-s3:9001
+    		reverse_proxy mar-s3:9001 {
+    			header_up X-Forwarded-Proto https
+    			header_up X-Forwarded-Host {host}
+    		}
     	}
 
     	handle {
