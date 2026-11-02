@@ -191,8 +191,12 @@ data:
     			}
     		}
 
+    		handle /api/user/auth-tokens/rotate {
+    			header Content-Type "application/json"
+    			respond `{"message":"Token rotation not required for SSO"}` 200
+    		}
+
     		handle {
-    			import authelia_auth
     			reverse_proxy grafana:3000 {
     				header_up X-Forwarded-Proto https
     				header_up X-Forwarded-Host {host}
@@ -210,20 +214,18 @@ data:
     		}
     	}
 
-    	# --- 7. Portainer Management GUI ---
+    	# --- 7. Portainer Management GUI (Direct Private Login) ---
     	@portainer_host host mar-portainer.gianlucamorello.it
     	handle @portainer_host {
-    		import authelia_auth
     		reverse_proxy portainer:9000 {
     			header_up X-Forwarded-Proto https
     			header_up X-Forwarded-Host {host}
     		}
     	}
 
-    	# --- 8. MinIO S3 Object Storage Console ---
+    	# --- 8. MinIO S3 Object Storage Console (Direct Private Login) ---
     	@s3_host host mar-s3.gianlucamorello.it
     	handle @s3_host {
-    		import authelia_auth
     		reverse_proxy mar-s3:9001 {
     			header_up X-Forwarded-Proto https
     			header_up X-Forwarded-Host {host}
@@ -406,8 +408,12 @@ data:
     			}
     		}
 
+    		handle /api/user/auth-tokens/rotate {
+    			header Content-Type "application/json"
+    			respond `{"message":"Token rotation not required for SSO"}` 200
+    		}
+
     		handle {
-    			import authelia_auth
     			reverse_proxy grafana:3000 {
     				header_up X-Forwarded-Proto https
     				header_up X-Forwarded-Host {host}
@@ -425,20 +431,18 @@ data:
     		}
     	}
 
-    	# --- 7. Portainer Management GUI ---
+    	# --- 7. Portainer Management GUI (Direct Private Login) ---
     	@portainer_host host mar-portainer.gianlucamorello.it
     	handle @portainer_host {
-    		import authelia_auth
     		reverse_proxy portainer:9000 {
     			header_up X-Forwarded-Proto https
     			header_up X-Forwarded-Host {host}
     		}
     	}
 
-    	# --- 8. MinIO S3 Object Storage Console ---
+    	# --- 8. MinIO S3 Object Storage Console (Direct Private Login) ---
     	@s3_host host mar-s3.gianlucamorello.it
     	handle @s3_host {
-    		import authelia_auth
     		reverse_proxy mar-s3:9001 {
     			header_up X-Forwarded-Proto https
     			header_up X-Forwarded-Host {host}
@@ -449,7 +453,6 @@ data:
     		respond "M.A.R. Auth Proxy - Host Not Found" 404
     	}
     }
-
   configuration.yml: |
     ---
     server:

@@ -36,11 +36,11 @@ spec:
             - $(TUNNEL_TOKEN)
           resources:
             requests:
-              cpu: 50m
-              memory: 32Mi
+              cpu: 100m
+              memory: 64Mi
             limits:
-              cpu: 250m
-              memory: 128Mi
+              cpu: 2000m
+              memory: 256Mi
 
         # Container 2: Caddy Reverse Proxy (Host Router & Forward Auth Enforcer)
         - name: caddy
@@ -59,11 +59,11 @@ spec:
               subPath: Caddyfile
           resources:
             requests:
-              cpu: 50m
-              memory: 32Mi
+              cpu: 100m
+              memory: 64Mi
             limits:
-              cpu: 300m
-              memory: 128Mi
+              cpu: 2000m
+              memory: 256Mi
 
         # Container 3: Authelia Authentication Server (SSO & Access Control)
         - name: authelia
@@ -86,11 +86,11 @@ spec:
               mountPath: /data
           resources:
             requests:
-              cpu: 50m
-              memory: 64Mi
+              cpu: 100m
+              memory: 128Mi
             limits:
-              cpu: 300m
-              memory: 256Mi
+              cpu: 2000m
+              memory: 512Mi
 
       volumes:
         - name: config-volume
